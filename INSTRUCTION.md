@@ -51,12 +51,33 @@ kubectl get secret todoapp-secret -n todoapp -o jsonpath="{.data.SECRET_KEY}"
 
 The Secret value is stored base64-encoded (`stringData` in the manifest is encoded by Kubernetes).
 
-## 3. Notes
+## 3. Build and deploy an image with the changed settings.py
 
-- The value in `secret.yml` is a demo value. The key that was hardcoded in `settings.py`
-  was public in Git history, so it must not be reused. In a real project a Secret manifest
-  with a real key is not committed to Git.
-- The image `ikulyk404/todoapp:3.0.0` is prebuilt with the old `settings.py`. To make the
-  running application use the key from the Secret, the image has to be rebuilt from the
-  changed code.
-  
+The prebuilt image `ikulyk404/todoapp:3.0.0` contains the old `settings.py`, so it does not read
+`SECRET_KEY` from the environment. Build and push your own image from the changed code
+(replace `<dockerhub-user>` with your Docker Hub login):
+
+```
+docker build -t <dockerhub-user>/todoapp:3.1.0 -f src/Dockerfile src
+docker push <dockerhub-user>/todoapp:3.1.0
+```
+
+Then point the Deployment to the new image and wait for the rollout:
+
+```
+kubectl set image deployment/todoapp todoapp=<dockerhub-user>/todoapp:3.1.0 -n todoapp
+kubectl rollout status deployment/todoapp -n todoapp
+```
+
+Alternatively change `image:` in `.infrastructure/deployment.yml` and run
+`kubectl apply -f .infrastructure/deployment.yml`.
+
+`settings.py` has no fallback: `SECRET_KEY = os.environ["SECRET_KEY"]`, so the application
+requires the variable from the Secret. For a local run without Kubernetes set it first,
+for example `export SECRET_KEY=local-test-key`.
+
+## 4. Notes
+
+The value in `secret.yml` is a demo value. The key that was hardcoded in `settings.py` was
+public in Git history, so it must not be reused. In a real project a Secret manifest with a
+real key is not committed to Git.
